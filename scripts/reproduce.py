@@ -174,18 +174,26 @@ class Lab:
                         process.wait(timeout=5)
 
     def status(self, port, path, expected):
+        last = {"status": None, "error": None}
+
         def get_status():
             connection = HTTPConnection("127.0.0.1", port, timeout=9)
             try:
                 connection.request("GET", path)
                 status = connection.getresponse().status
+                last.update(status=status, error=None)
                 return status if status in expected else None
-            except (OSError, HTTPException):
+            except (OSError, HTTPException) as error:
+                last.update(status=None, error=type(error).__name__)
                 return None
             finally:
                 connection.close()
 
-        return poll(get_status, f"GET {path} did not return one of {expected}")
+        try:
+            return poll(get_status, f"GET {path} did not return one of {expected}")
+        except RuntimeError as error:
+            observed = f"HTTP {last['status']}" if last["status"] is not None else (last["error"] or "no response")
+            raise RuntimeError(f"{error}; last observed: {observed}") from error
 
     def ready_endpoints(self):
         slices = self.get("endpointslices", "-l", "kubernetes.io/service-name=t1-web")
@@ -231,19 +239,33 @@ class Lab:
             return
 
         self.restart_gateway()
-        with self.forward() as port:
-            self.status(port, "/healthz", (200,))
-            self.status(port, f"/api/?reproduction={self.run_id}", (502,))
 
-        def matching_log():
+        def log_evidence():
             logs = self.kubectl("logs", GATEWAY, "--since=2m", "--tail=80")
-            return any(
+            matching_request = any(self.run_id in line for line in logs.splitlines())
+            wrong_port = any(
                 self.run_id in line and re.search(r'upstream: "http://[^"/]+:81/', line)
                 for line in logs.splitlines()
             )
+            return matching_request, wrong_port
 
-        poll(matching_log, "Nginx did not log an upstream port 81 error for this run")
-        print("T3: /healthz=200 /api/=502, Nginx evidence shows upstream port 81", flush=True)
+        try:
+            with self.forward() as port:
+                self.status(port, "/healthz", (200,))
+                # Depending on the network's rejection behavior, Nginx reports
+                # an immediate connection failure as 502 or a timeout as 504.
+                status = self.status(port, f"/api/?reproduction={self.run_id}", (502, 504))
+        except RuntimeError:
+            try:
+                matching_request, wrong_port = log_evidence()
+                print(f"T3 diagnostic: matching request={matching_request}, port 81 evidence={wrong_port}",
+                      file=sys.stderr)
+            except (RuntimeError, OSError, subprocess.SubprocessError):
+                print("T3 diagnostic: gateway logs unavailable", file=sys.stderr)
+            raise
+
+        poll(lambda: log_evidence()[1], "Nginx did not log an upstream port 81 error for this run")
+        print(f"T3: /healthz=200 /api/={status}, Nginx evidence shows upstream port 81", flush=True)
 
     def reproduce(self, case, hook):
         self.rollout("deployment/t1-web")

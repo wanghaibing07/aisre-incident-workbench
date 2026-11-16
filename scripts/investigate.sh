@@ -8,7 +8,7 @@ fi
 
 case "$1" in
     t1) question='In the incident-lab demo the t1-web workload looks ready, but requests through the gateway fail. Use the incident-lab tools to investigate. Cite observed evidence and identify the cause; do not perform any changes.' ;;
-    t3) question='In the incident-lab demo the gateway health check is 200 but /api/ returns 502. Use the incident-lab tools to investigate. Cite observed evidence and identify the cause; do not perform any changes.' ;;
+    t3) question='In the incident-lab demo the gateway health check is 200 but /api/ returns a 5xx error. Use the incident-lab tools to investigate. Cite observed evidence and identify the cause; do not perform any changes.' ;;
     *) printf 'Unknown case: %s\n' "$1" >&2; exit 2 ;;
 esac
 

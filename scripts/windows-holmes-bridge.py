@@ -168,7 +168,7 @@ def run_bridge(args):
 
         ToolExecutor.__init__ = guarded_init
         symptoms = ("the web workload is ready but requests through the gateway fail" if args.case == "t1"
-                    else "the gateway health check is 200 but /api/ returns 502")
+                    else "the gateway health check is 200 but /api/ returns a 5xx error")
         question = (f"In namespace {args.namespace}, {symptoms}. Investigate with the available read-only tools. "
                     "Explain the root cause with evidence. Do not propose or perform changes.")
         sys.argv = ["holmes", "ask", question, "--model", args.model, "--no-interactive", "--max-steps", "8",

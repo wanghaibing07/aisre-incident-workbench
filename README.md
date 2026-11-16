@@ -16,6 +16,8 @@
 
 后来将 Windows 桥接参数化并补入项目，又在隔离命名空间复测了 T1/T3；[复测证据](evidence/windows-bridge-reproduction.json)记录了脚本哈希、工具和恢复结果。T1 使用交付的等待钩子，T3 使用等价的临时等待钩子；这仍不是统计准确率测试。
 
+远端 CI 首次运行后，复现脚本增加了 504 兼容和失败诊断，两个调查钩子的 T3 故障描述也改为更准确的 5xx。既有实验记录保留当时的脚本哈希，不冒充是在修改后重新执行。
+
 复测中，模型虽被要求不提出修改，仍在文字中给出了修复建议；这些建议没有被执行。实际权限由只读工具和 Kubernetes RBAC 约束，恢复由操作者执行。
 
 上述 Kubernetes 实验之后，复现脚本增加了调查钩子的上下文一致性检查。原证据保留当时的源码哈希；新版本已在同一隔离命名空间复验 T1/T3 和恢复，[新证据](evidence/context-hook-smoke.json)记录了上下文拒绝与测试钩子结果。该钩子没有调用模型。
@@ -66,7 +68,9 @@ kind create cluster --name incident-workbench
 bash scripts/smoke.sh --context kind-incident-workbench
 ```
 
-这一步不调用 LLM。它用短期 ServiceAccount 凭据执行取证并验证禁止权限，再检查 T1 的 EndpointSlice 无可用后端、T3 的 Nginx 日志出现错误端口，以及两次恢复后 `/api/` 均返回 200。[CI 配置](.github/workflows/incident-lab.yml)计划在独立 kind 集群执行同一脚本；相同版本和镜像的[本地 kind 验证](evidence/kind-workflow-local.json)已通过，但 GitHub Actions 本身尚未实跑。复用已部署的实验环境时也可以单独运行 `bash scripts/verify-rbac.sh --context kind-incident-workbench`。
+这一步不调用 LLM。它用短期 ServiceAccount 凭据执行取证并验证禁止权限，再检查 T1 的 EndpointSlice 无可用后端、T3 的 Nginx 日志出现错误端口，以及两次恢复后 `/api/` 均返回 200。[CI 配置](.github/workflows/incident-lab.yml)在独立 kind 集群执行同一脚本；相同版本和镜像的[本地 kind 验证](evidence/kind-workflow-local.json)已通过。首次 [GitHub Actions 运行](https://github.com/wanghaibing07/aisre-incident-workbench/actions/runs/43909333677)在 T3 未观察到预期状态而失败，修复后需以新的工作流结果为准。复用已部署的实验环境时也可以单独运行 `bash scripts/verify-rbac.sh --context kind-incident-workbench`。
+
+错误上游连接被立即拒绝时可能返回 502，超时时可能返回 504；复现脚本接受两者，同时必须在本次请求对应的网关日志中观察到错误的 81 端口。此前实验记录的是实际出现的 502。
 
 已有实验集群中如果 `incident-lab` 已存在，可以生成另一个命名空间的副本。下面示例仅把副本中的两个演示 Pod 调度到所选节点，并为它们添加控制节点容忍；不会改变节点污点或原有 `incident-lab`。先确认节点及集群是本次实验允许使用的环境：
 
