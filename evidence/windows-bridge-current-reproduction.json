@@ -1,0 +1,48 @@
+{
+  "recorded_at_utc": "2026-11-16T17:15:01Z",
+  "source_commit_before_evidence": "ecbf32c88bb09014769e819d58fcf40da54170e8",
+  "environment": "HolmesGPT 0.43.0 on Windows with local Magpie workbuddy/glm-5.3-flash; Kubernetes v1.36.4 in a newly created isolated VMware lab namespace",
+  "scope": "Actual parameterized Windows bridge, three fixed SSH read-only tools using a temporary namespace-scoped ServiceAccount credential; no reverse tunnel. Both cases used the delivered wait-investigation.sh to hold the fault while the model investigated.",
+  "source_hash_encoding": "SHA-256 of UTF-8 text with LF line endings",
+  "source_sha256": {
+    "scripts/windows-holmes-bridge.py": "2b277a888db071bc609445b407d871f3895eb5c36be273af1831f783445fd7be",
+    "scripts/reproduce.py": "f13ff68290e46c2b093169bbe973f9b6f35cb51bc2fade404a62a412df9ad9e4",
+    "scripts/wait-investigation.sh": "0744a7e601e326193f20d97ab51281429fd0ef349c069222c450a7cabad1d77a",
+    "scripts/agent-kubeconfig.sh": "c6d599921296db089a66b123ed801264a84335fa40fb5872fb2b4b8941cce06f",
+    "scripts/prepare-isolated.py": "2db7de10c8ebcc43fc82f299472c9965bd151178b07db77abefbc66d3220fa10",
+    "k8s/agent-rbac.yaml": "fecc3c238069a6326b2283dfe6e9b8ac529a125e20029d8b6313d4afb1a32bf4"
+  },
+  "fixture_hashes": {
+    "note": "The generated fixture replaces the namespace in source files. Its hashes were independently compared with the files copied to the VM.",
+    "scripts/reproduce.py": "4303bbd99b12dce01eab700f744753ba21772493ab827de7edc13dd3df1ee89a",
+    "scripts/wait-investigation.sh": "0744a7e601e326193f20d97ab51281429fd0ef349c069222c450a7cabad1d77a",
+    "scripts/agent-kubeconfig.sh": "f9df2092d15892d5aca31ee263ce0ecbb82d06e6db204ed8e0a0e9ae4f585a95"
+  },
+  "cases": [
+    {
+      "case": "t1",
+      "fault_and_restore": [
+        "Baseline: /healthz=200 /api/=200",
+        "T1: Pod Ready, EndpointSlice ready endpoints=0, /healthz=200 /api/=502",
+        "Restored: /healthz=200 /api/=200"
+      ],
+      "bridge_exit_code": 0,
+      "tools_succeeded": ["incident_lab_pod_snapshot", "incident_lab_service_route_evidence", "incident_lab_gateway_error_logs"],
+      "finding": "The model identified that the service selector app=t1-web-fault did not match the pod label app=t1-web, leaving the EndpointSlice without backends."
+    },
+    {
+      "case": "t3",
+      "fault_and_restore": [
+        "Baseline: /healthz=200 /api/=200",
+        "T3: /healthz=200 /api/=502, Nginx evidence shows upstream port 81",
+        "Restored: /healthz=200 /api/=200"
+      ],
+      "bridge_exit_code": 0,
+      "tools_succeeded": ["incident_lab_pod_snapshot", "incident_lab_service_route_evidence", "incident_lab_gateway_error_logs"],
+      "finding": "The model compared gateway log upstream port 81 with the service port 80 and identified the mismatch."
+    }
+  ],
+  "access_and_cleanup": "After the investigations, the delivered RBAC verification confirmed the service account, the three allowed read operations and 18 denied operations. The service selector and gateway configuration were confirmed restored; the newly created namespace and remote fixture and signal directories were removed. The pre-existing evaluation namespace was not deleted.",
+  "model_behavior": "Although instructed not to propose changes, the model included unapplied repair suggestions in both answers. The tools were read-only; the reproduction script restored the faults after the wait hook was released.",
+  "limitations": "One synthetic investigation per case after engineering iteration is not a statistical accuracy or time-saving measurement. Raw investigation logs are not published because they contain lab details. This run used the Windows bridge, not the Linux native investigation hook, and did not run GitHub Actions."
+}
