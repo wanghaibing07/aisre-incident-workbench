@@ -68,7 +68,7 @@ kind create cluster --name incident-workbench
 bash scripts/smoke.sh --context kind-incident-workbench
 ```
 
-这一步不调用 LLM。它用短期 ServiceAccount 凭据执行取证并验证禁止权限，再检查 T1 的 EndpointSlice 无可用后端、T3 的 Nginx 日志出现错误端口，以及两次恢复后 `/api/` 均返回 200。[CI 配置](.github/workflows/incident-lab.yml)在独立 kind 集群执行同一脚本；相同版本和镜像的[本地 kind 验证](evidence/kind-workflow-local.json)已通过。首次 [GitHub Actions 运行](https://github.com/wanghaibing07/aisre-incident-workbench/actions/runs/43909333677)在 T3 未观察到预期状态而失败，修复后需以新的工作流结果为准。复用已部署的实验环境时也可以单独运行 `bash scripts/verify-rbac.sh --context kind-incident-workbench`。
+这一步不调用 LLM。它用短期 ServiceAccount 凭据执行取证并验证禁止权限，再检查 T1 的 EndpointSlice 无可用后端、T3 的 Nginx 日志出现错误端口，以及两次恢复后 `/api/` 均返回 200。[CI 配置](.github/workflows/incident-lab.yml)在独立 kind 集群执行同一脚本；相同版本和镜像的[本地 kind 验证](evidence/kind-workflow-local.json)已通过。首次 [GitHub Actions 运行](https://github.com/wanghaibing07/aisre-incident-workbench/actions/runs/43909333677)在 T3 未观察到预期状态而失败；增加 504 兼容和同一请求的日志证据检查后，[后续运行](https://github.com/wanghaibing07/aisre-incident-workbench/actions/runs/43911969837)通过，实际观察到 504。首次失败的具体状态未记录，不能据此断言当时也是 504。复用已部署的实验环境时也可以单独运行 `bash scripts/verify-rbac.sh --context kind-incident-workbench`。
 
 错误上游连接被立即拒绝时可能返回 502，超时时可能返回 504；复现脚本接受两者，同时必须在本次请求对应的网关日志中观察到错误的 81 端口。此前实验记录的是实际出现的 502。
 
