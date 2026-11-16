@@ -20,6 +20,8 @@
 
 上述改动后，以当前脚本在新的隔离命名空间重新进行了 [T1/T3 真实模型调查](evidence/windows-bridge-current-reproduction.json)：两次都使用交付的等待钩子和 Windows 桥接，三个只读工具成功执行，模型指出相应原因，释放后业务恢复。该记录包含源码哈希和清理范围；它仍是每种故障各一次的合成场景，不代表生产准确率。Linux 原生调查钩子没有在这次运行中验收。
 
+之后在 VMware 的 Linux 节点上，使用 HolmesGPT 0.43.0 和本地模拟模型服务[验证了调查入口的工具白名单](evidence/linux-holmes-guard-fake-model.json)：允许的工具被正确传递，多余工具和修改后的配置会在模型请求前被拒绝。该测试只运行从钩子提取的 Python 部分，未执行完整 Shell 钩子、访问 Kubernetes 或调用真实模型；本机 Magpie 仅监听 Windows 回环地址，Linux 原生真实调查仍未验收。
+
 复测中，模型虽被要求不提出修改，仍在文字中给出了修复建议；这些建议没有被执行。实际权限由只读工具和 Kubernetes RBAC 约束，恢复由操作者执行。
 
 上述 Kubernetes 实验之后，复现脚本增加了调查钩子的上下文一致性检查。原证据保留当时的源码哈希；新版本已在同一隔离命名空间复验 T1/T3 和恢复，[新证据](evidence/context-hook-smoke.json)记录了上下文拒绝与测试钩子结果。该钩子没有调用模型。

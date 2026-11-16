@@ -1,0 +1,20 @@
+{
+  "recorded_at_utc": "2026-11-16T18:16:08Z",
+  "source_commit_before_evidence": "a14c929b2750b401f20af131743b8069ffdac9fc",
+  "environment": "Existing isolated VMware laboratory control node; Python 3.12.15 and HolmesGPT 0.43.0 in an existing virtual environment",
+  "scope": "Executed tests/verify_holmes_guard.py on Linux against a temporary local fake Chat Completions endpoint. The test extracts the guarded Python entry from scripts/investigate.sh; it does not run the complete shell hook or access Kubernetes.",
+  "source_hash_encoding": "SHA-256 of UTF-8 text with LF line endings",
+  "source_sha256": {
+    "scripts/investigate.sh": "6c628908a8b91cbfe4041183c5388a9cb5c8b91b789e879996a0ffdb58e593dd",
+    "tests/verify_holmes_guard.py": "00f8d30eec60edae524e397d99b59e4b5707c70f399e8a90a1c21208c3464ffa",
+    "toolsets/incident-lab-readonly.yaml": "44e44e27ebfbbd18293f0c4801554646fbf1cc15369fcd8efecf4b3b239cbbc0",
+    "toolsets/holmes-lab-config.yaml": "5179f83b5ab932de17254026412598d13b769a3cbf4485b37e00e52771386f02"
+  },
+  "checks": [
+    "PASS: model request to the fake endpoint contained exactly the three allowed tools",
+    "PASS: an extra tool stopped execution before any model request",
+    "PASS: an altered config template stopped execution before any model request"
+  ],
+  "cleanup": "Files were streamed to a private temporary directory with exit-trap cleanup; no persistent laboratory settings were changed.",
+  "limitations": "This is a fake model test, not a real LLM investigation or end-to-end Linux native hook validation. The Magpie service was listening only on the Windows host loopback, while the guest had no configured provider environment or listening model endpoint. No reverse SSH tunnel was attempted."
+}
