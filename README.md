@@ -12,7 +12,7 @@
 
 面试时可以沿着「故障现象 → 哪个证据缺失 → 如何补工具 → 权限和人工恢复边界 → 怎样复现」讲清楚。历史案例已有调查摘要，原始终端记录未随仓库发布。本轮在 VMware 集群的独立命名空间验证了受限身份、18 项权限拒绝以及 T1/T3 注入和恢复；[结果和范围](evidence/kubernetes-smoke.json)说明了单节点运行的适配。
 
-随后在故障保持期间，使用 HolmesGPT 0.43.0 和本地 Magpie 模型调查，两次均调用三个受限只读工具并指出对应原因；[调查证据](evidence/holmes-model-investigations.json)记录了调用、关键数据和恢复。该实验通过 Windows 兼容桥接与 SSH 执行取证，Linux 原生调查钩子和 GitHub Actions 尚未实际运行；每种故障只有一次新调查，不能据此推断统计准确率。
+随后在故障保持期间，使用 HolmesGPT 0.43.0 和本地 Magpie 模型调查，两次均调用三个受限只读工具并指出对应原因；[调查证据](evidence/holmes-model-investigations.json)记录了调用、关键数据和恢复。该次实验通过 Windows 兼容桥接与 SSH 执行取证，没有运行 Linux 原生调查钩子或 GitHub Actions；每种故障只有一次新调查，不能据此推断统计准确率。
 
 后来将 Windows 桥接参数化并补入项目，又在隔离命名空间复测了 T1/T3；[复测证据](evidence/windows-bridge-reproduction.json)记录了脚本哈希、工具和恢复结果。T1 使用交付的等待钩子，T3 使用等价的临时等待钩子；这仍不是统计准确率测试。
 
