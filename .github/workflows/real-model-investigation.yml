@@ -1,0 +1,38 @@
+name: Real model investigation (manual)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  investigation:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
+        with:
+          persist-credentials: false
+      - name: Check runner resources
+        run: bash scripts/hosted-real-model.sh --resources
+      - name: Create isolated Kubernetes cluster
+        uses: helm/kind-action@92086f6be054225fa813e0a4b13787fc9088faab
+        with:
+          version: v0.30.0
+          cluster_name: incident-workbench
+          node_image: kindest/node:v1.34.0@sha256:7416a61b42b1662ca6ca89f02028ac133a309a2a30ba309614e8ec94d976dc5a
+      - name: Run real local model investigations
+        run: bash scripts/hosted-real-model.sh --run
+      - name: Delete isolated cluster
+        if: always()
+        run: |
+          if command -v kind >/dev/null 2>&1; then kind delete cluster --name incident-workbench; fi
+      - name: Upload sanitized observations
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: real-model-investigation-observations
+          path: ${{ runner.temp }}/incident-evidence/
+          if-no-files-found: ignore
+          retention-days: 7
