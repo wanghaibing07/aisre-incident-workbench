@@ -1,0 +1,26 @@
+{
+  "recorded_at_utc": "2026-11-16T13:44:25.669274+00:00",
+  "environment": "Existing VMware laboratory, Kubernetes v1.36.4, isolated namespace incident-eval-1c6ece92c6bd",
+  "scope": "A newly prepared fixture targeted the existing dedicated evaluation namespace. No changes were made to incident-lab. Hook only checked its context and case; it did not run HolmesGPT or call a model.",
+  "source_hash_encoding": "SHA-256 of UTF-8 text with LF line endings",
+  "source_reproduce_sha256": "1f6a0ea95ad342f14e12a0d5d2a0d68470c9962d4c5993b71897ba9a97f1d5e0",
+  "namespace_substituted_reproduce_sha256": "ac53c477c80818ab7a1343b06219da4b5b39a6ed577edc942cd3d53e7aa7012d",
+  "hook_sha256": "c49aba2f6b41915b254ca5e0bd67de432682421f5bf31f29d4edfc948bed0ac8",
+  "hook_source": "#!/usr/bin/env bash\nset -euo pipefail\ntest \"${LAB_CONTEXT:-}\" = \"kubernetes-admin@kubernetes\"\ncase \"${1:-}\" in t1|t3) ;; *) exit 1 ;; esac\nprintf 'PASS hook context and case: %s\\n' \"$1\"\n",
+  "mismatch": "LAB_CONTEXT=incorrect with --context kubernetes-admin@kubernetes was rejected with the expected error before accessing the cluster.",
+  "cases": {
+    "t1": [
+      "Baseline: /healthz=200 /api/=200",
+      "T1: Pod Ready, EndpointSlice ready endpoints=0, /healthz=200 /api/=502",
+      "PASS hook context and case: t1",
+      "Restored: /healthz=200 /api/=200"
+    ],
+    "t3": [
+      "Baseline: /healthz=200 /api/=200",
+      "T3: /healthz=200 /api/=502, Nginx evidence shows upstream port 81",
+      "PASS hook context and case: t3",
+      "Restored: /healthz=200 /api/=200"
+    ]
+  },
+  "limitations": "This validates the context guard and a synthetic hook through fault and restoration; it does not validate the Linux Holmes investigation hook or GitHub Actions."
+}

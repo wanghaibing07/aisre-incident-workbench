@@ -1,0 +1,91 @@
+{
+  "recorded_at_utc": "2026-11-16T12:58:26.881020+00:00",
+  "environment": "HolmesGPT 0.43.0 on Windows with a Git Bash compatibility adapter; real Kubernetes v1.36.4 in a dedicated namespace on the VMware lab control-plane node",
+  "model": "workbuddy/glm-5.3-flash via local Magpie",
+  "access": "Three fixed, parameter-free read-only tools use SSH to run kubectl with a short-lived namespace-scoped ServiceAccount credential. Built-in Holmes toolsets were disabled.",
+  "method": "Fault injection ran on Linux in the isolated namespace. A bounded hold hook kept the fault present while Holmes investigated from the host; the operator then released the hook and the script restored the baseline.",
+  "limitations": "This is one synthetic run per case, after engineering iteration, not a statistical accuracy or time-saving measurement. The Linux-only direct investigation hook and GitHub Actions have not been independently executed.",
+  "adapter_sha256": {
+    "run-holmes-windows.py": "625ec23a7694de1b631f6ab934899d6f9d0496bc9b1bcca7a7def0d0ec7e4ea3",
+    "sre-read-remote.py": "757ff553440b48ed427e0ee8e99a4cee797b1d369561734544730ef307663c67",
+    "sre-fault-hold.sh": "b33302f96467b5b1302b34cb8b8c3b905543d2bedff2a8f3ecb933dc9d75ef32"
+  },
+  "cases": [
+    {
+      "case": "t1",
+      "model_calls": 2,
+      "tokens": {
+        "prompt": 19873,
+        "completion": 608
+      },
+      "tools": [
+        {
+          "name": "incident_lab_gateway_error_logs",
+          "status": "success"
+        },
+        {
+          "name": "incident_lab_pod_snapshot",
+          "status": "success"
+        },
+        {
+          "name": "incident_lab_service_route_evidence",
+          "status": "success"
+        }
+      ],
+      "observed": {
+        "service_selector": {
+          "app": "t1-web-fault"
+        },
+        "pod_app_label": "t1-web",
+        "service_port": 80,
+        "ready_endpoints": 0,
+        "upstream_log": "2026-11-16T20:49:56.625571259+08:00 2026/11/16 12:49:56 [error] 20#20: *168 connect() failed (111: Connection refused) while connecting to upstream, client: [CLUSTER_IP], server: _, request: \"GET /api/ HTTP/1.1\", upstream: \"http://[CLUSTER_IP]:80/\", host: \"[CLUSTER_IP]:38815\""
+      },
+      "model_answer": "## Root cause\n\nThe `t1-web` Service selects a label that no pod carries, so it has **zero endpoints** — the gateway's upstream is a VIP with nothing behind it.\n\n**Evidence:**\n\n1. **Label mismatch:**\n   - Pod `t1-web-79bfdf6f74-mnqms` labels: `app: t1-web`\n   - Service `t1-web` selector: `app: t1-web-fault`\n2. **Empty EndpointSlice:** `t1-web-dr2zm` has `\"endpoints\": null` and `\"ports\": null` — no ready backends. (Compare `t3-gateway-qvs5k`, which correctly lists `[CLUSTER_IP]` ready on 8080.)\n3. **Gateway logs confirm the failure mode** (`t3-gateway` nginx error log, 2026-11-16 12:49:56 UTC):\n\n```\n\"GET /api/ HTTP/1.1\" 502 157\n[error] *168 connect() failed (111: Connection refused) while connecting to upstream,\nclient: [CLUSTER_IP], upstream: \"http://[CLUSTER_IP]:80/\"\n```\n\n`[CLUSTER_IP]` is the `t1-web` ClusterIP. Connection refused on a Service VIP with no endpoints is the classic signature — traffic reaches the VIP but kube-proxy has no backend to forward to.\n\n**Not the cause (checked, healthy):**\n- `t1-web-79bfdf6f74-mnqms` — Running, Ready, restarts 0, serving on container port 80; the web app itself is fine.\n- `t3-gateway-69df55bd55-tx7g9` — Running, Ready; `/healthz` probes all 200. Note it even returned 200 for `GET /api/` at 12:49:55 before failing at 12:49:56 — likely a stale upstream connection briefly worked, then the refused connection confirmed the empty backend pool.\n\n**Fix (for reference, not applied):** change the `t1-web` Service selector from `app: t1-web-fault` to `app: t1-web`. The EndpointSlice will then pick up `[CLUSTER_IP]:80` and the 502s will stop.",
+      "fault_and_restore": [
+        "Baseline: /healthz=200 /api/=200",
+        "T1: Pod Ready, EndpointSlice ready endpoints=0, /healthz=200 /api/=502",
+        "READY_FOR_HOLMES: t1",
+        "Restored: /healthz=200 /api/=200"
+      ]
+    },
+    {
+      "case": "t3",
+      "model_calls": 2,
+      "tokens": {
+        "prompt": 15633,
+        "completion": 729
+      },
+      "tools": [
+        {
+          "name": "incident_lab_gateway_error_logs",
+          "status": "success"
+        },
+        {
+          "name": "incident_lab_pod_snapshot",
+          "status": "success"
+        },
+        {
+          "name": "incident_lab_service_route_evidence",
+          "status": "success"
+        }
+      ],
+      "observed": {
+        "service_selector": {
+          "app": "t1-web"
+        },
+        "pod_app_label": "t1-web",
+        "service_port": 80,
+        "ready_endpoints": 1,
+        "upstream_log": "2026-11-16T20:53:08.166308830+08:00 2026/11/16 12:53:08 [error] 22#22: *3 upstream prematurely closed connection while reading response header from upstream, client: [CLUSTER_IP], server: _, request: \"GET /api/?reproduction=32fca1ccf5f24e16af994b42550a14f1 HTTP/1.1\", upstream: \"http://[CLUSTER_IP]:81/?reproduction=32fca1ccf5f24e16af994b42550a14f1\", host: \"[CLUSTER_IP]:44349\""
+      },
+      "model_answer": "## Root cause\n\n`t3-gateway`'s nginx config proxies `/api/` to the `t1-web` Service on the **wrong port: 81 instead of 80**.\n\n### Evidence\n\n**1. Gateway error log** (t3-gateway-65cfd8df8d-7rx75, 12:53:08 UTC):\n```\n[error] 22#22: *3 upstream prematurely closed connection while reading response header from upstream,\nrequest: \"GET /api/?reproduction=32fca1ccf5f24e16af994b42550a14f1 HTTP/1.1\",\nupstream: \"http://[CLUSTER_IP]:81/...\"\n\"GET /api/...\" 502 157\n```\nThe upstream IP `[CLUSTER_IP]` is correct — that's the `t1-web` Service ClusterIP — but the port is **81**. Nothing listens on 81, so the connection is closed immediately and nginx returns 502.\n\n**2. Service definition** (`t1-web`): exposes `port: 80 → targetPort: 80`, selector `app: t1-web`.\n\n**3. EndpointSlice** (`t1-web-dr2zm`): single healthy endpoint `[CLUSTER_IP]:80`, ready/serving=true. The backend pod `t1-web-79bfdf6f74-mnqms` (nginx:1.25) is Running, Ready, restartCount 0 — the backend itself is fine and reachable on port 80 only.\n\n### Why health check passes\n`/healthz` is served locally by the gateway's own nginx — the kube-probe log shows `GET /healthz → 200` every 10s from `[CLUSTER_IP]`. The readiness probe only tests nginx itself; it never touches the `/api/` proxy path, so the bad upstream port doesn't affect pod readiness.\n\n### Fix (not applied, per your instruction)\nUpdate the `t3-gateway-config` ConfigMap so the `proxy_pass` for `/api/` targets `http://t1-web.incident-eval-1c6ece92c6bd.svc.cluster.local:80` (or `http://[CLUSTER_IP]:80`) instead of port 81, then restart the gateway pod (it was last restarted 12:52:51 UTC via `kubectl rollout restart`, per the `kubectl.kubernetes.io/restartedAt: 2026-11-16T20:52:51+08:00` annotation).\n\n**Blast radius:** only `/api/` routing through `t3-gateway` is broken; `t1-web` itself and direct port-80 access are healthy (verified above).",
+      "fault_and_restore": [
+        "Baseline: /healthz=200 /api/=200",
+        "T3: /healthz=200 /api/=502, Nginx evidence shows upstream port 81",
+        "READY_FOR_HOLMES: t3",
+        "Restored: /healthz=200 /api/=200"
+      ]
+    }
+  ]
+}

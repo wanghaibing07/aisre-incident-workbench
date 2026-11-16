@@ -28,7 +28,7 @@ flowchart LR
 2. `incident_lab_service_route_evidence`：读取 Pod、Service、EndpointSlice，比较标签、选择器和后端端口。
 3. `incident_lab_gateway_error_logs`：读取网关最近 15 分钟的日志，最多 80 行。
 
-Agent 通过现有 ServiceAccount 的命名空间级权限访问 API；故障注入和恢复由人工使用独立管理身份操作。工具源文件位于 [toolsets](../toolsets/incident-lab-readonly.yaml)。
+Agent 通过命名空间专用的 [ServiceAccount 和 RBAC](../k8s/agent-rbac.yaml) 访问 API。操作者用独立的集群身份部署、注入故障和恢复；运行 Holmes 时只传入短期调查凭据。日志授权覆盖该命名空间中动态命名的 Pod，工具固定只查询网关日志。工具源文件位于 [toolsets](../toolsets/incident-lab-readonly.yaml)。
 
 ## 已验证的故障
 
@@ -39,6 +39,6 @@ Agent 通过现有 ServiceAccount 的命名空间级权限访问 API；故障注
 
 ## 已知边界
 
-- GitHub 中的 [Kubernetes 清单](../k8s/incident-lab.yaml) 依据运行环境参数重建，仅通过客户端解析，尚未在全新集群部署验收。
-- 仓库没有提供完整的 Agent 权限配置、模型凭据或一键部署脚本，因此尚不能称为端到端一键复现。
+- [Kubernetes 清单](../k8s/incident-lab.yaml) 依据历史运行环境重建。使用 [复现说明](../README.md#复现与验证) 在隔离环境重新验收。
+- 集群 smoke 测试验证受限身份与业务症状，不能替代真实 Holmes 模型调查。真实模型需另行提供凭据和环境。
 - 没有证明 Agent 能自动修复故障，也没有进行长期稳定性或统计显著性验证。

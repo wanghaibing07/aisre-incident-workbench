@@ -1,0 +1,47 @@
+{
+  "recorded_at_utc": "2026-11-16T14:37:40.843658+00:00",
+  "environment": "HolmesGPT 0.43.0 on Windows, local Magpie workbuddy/glm-5.3-flash, Kubernetes v1.36.4 in VMware lab isolated namespace",
+  "scope": "Actual parameterized Windows bridge, three fixed SSH read-only tools using a temporary namespace-scoped ServiceAccount credential; no reverse tunnel.",
+  "source_hash_encoding": "SHA-256 of UTF-8 text with LF line endings",
+  "source_sha256": {
+    "scripts/windows-holmes-bridge.py": "8a6b0555e46935e320ab865fa7382aaa7726589793db8503d08bd9316d1e148e",
+    "scripts/wait-investigation.sh": "0744a7e601e326193f20d97ab51281429fd0ef349c069222c450a7cabad1d77a",
+    "scripts/reproduce.py": "1f6a0ea95ad342f14e12a0d5d2a0d68470c9962d4c5993b71897ba9a97f1d5e0"
+  },
+  "cases": [
+    {
+      "case": "t1",
+      "tools_observed": [
+        "incident_lab_pod_snapshot",
+        "incident_lab_service_route_evidence",
+        "incident_lab_gateway_error_logs"
+      ],
+      "bridge_exit_code": 0,
+      "fault_and_restore": [
+        "Baseline: /healthz=200 /api/=200",
+        "T1: Pod Ready, EndpointSlice ready endpoints=0, /healthz=200 /api/=502",
+        "Restored: /healthz=200 /api/=200"
+      ],
+      "finding": "Service selector app=t1-web-fault did not match Pod label app=t1-web.",
+      "handoff": "Delivered wait-investigation.sh"
+    },
+    {
+      "case": "t3",
+      "tools_observed": [
+        "incident_lab_pod_snapshot",
+        "incident_lab_service_route_evidence",
+        "incident_lab_gateway_error_logs"
+      ],
+      "bridge_exit_code": 0,
+      "fault_and_restore": [
+        "Baseline: /healthz=200 /api/=200",
+        "T3: /healthz=200 /api/=502, Nginx evidence shows upstream port 81",
+        "Restored: /healthz=200 /api/=200"
+      ],
+      "finding": "Gateway upstream used port 81 while the Service exposes port 80.",
+      "handoff": "Temporary equivalent bounded hold hook"
+    }
+  ],
+  "model_behavior": "Despite being asked not to propose changes, the model included remediation suggestions in text. It did not execute changes; investigation tools and Kubernetes permissions remained read-only.",
+  "limitations": "Each case is a synthetic investigation after iteration; not a statistical accuracy or time-saving measurement. T1 used the delivered handoff script; T3 used an equivalent temporary hook. Linux native Holmes and GitHub Actions remain unverified."
+}

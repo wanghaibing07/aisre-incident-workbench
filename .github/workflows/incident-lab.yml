@@ -1,0 +1,45 @@
+name: Incident Lab
+
+on:
+  push:
+    paths:
+      - '.github/workflows/incident-lab.yml'
+      - 'k8s/**'
+      - 'scripts/**'
+      - 'tests/**'
+      - 'toolsets/**'
+  pull_request:
+    paths:
+      - '.github/workflows/incident-lab.yml'
+      - 'k8s/**'
+      - 'scripts/**'
+      - 'tests/**'
+      - 'toolsets/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
+        with:
+          persist-credentials: false
+      - name: Check shell scripts
+        run: |
+          for script in scripts/*.sh; do
+            bash -n "$script"
+          done
+      - name: Check isolated fixture and investigation hook
+        run: python3 -m unittest discover -s tests -p 'test_*.py' -v
+      - name: Create isolated Kubernetes cluster
+        uses: helm/kind-action@92086f6be054225fa813e0a4b13787fc9088faab
+        with:
+          version: v0.30.0
+          cluster_name: incident-workbench
+          node_image: kindest/node:v1.34.0@sha256:7416a61b42b1662ca6ca89f02028ac133a309a2a30ba309614e8ec94d976dc5a
+      - name: Verify access, fault evidence and restoration
+        run: bash scripts/smoke.sh --context kind-incident-workbench
