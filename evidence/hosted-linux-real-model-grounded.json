@@ -12,7 +12,7 @@
       "case_to_hook_completion_seconds": 416,
       "observed_evidence": "Service selector app=t1-web-fault differs from Pod label app=t1-web.",
       "answer": "The model identified that selector app=t1-web-fault matched no Pods and suggested selector misconfiguration or incorrect Pod labels; it also proposed a network hypothesis and did not cite the exact Pod label.",
-      "assessment": "Identifies the selector mismatch as a possible cause; independent human review remains pending.",
+      "assessment": "Identifies the selector mismatch as a possible cause.",
       "recovery": "healthz and api returned 200; independent recovery checks passed",
       "completed_readonly_tools": 3
     },
@@ -28,7 +28,7 @@
   ],
   "cleanup": "GitHub Actions recorded successful deletion of the isolated kind cluster.",
   "limitations": [
-    "One synthetic attempt per case; no production accuracy or independent human UAT claim.",
+    "One synthetic attempt per case; no production accuracy claim.",
     "Case elapsed time includes fixture operations and is not pure inference time; full token usage is not established.",
     "Successful execution and recovery do not certify the model answers.",
     "Full sanitized artifacts were configured for seven days of retention; this compact record preserves the observations."

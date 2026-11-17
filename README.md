@@ -1,42 +1,14 @@
 # AI SRE Incident Investigation Workbench
 
-**让 AI Agent 协助 SRE 排查 Kubernetes 服务故障。** Agent 自动读取工作负载、服务路由和网关日志，分析故障证据、定位错误；工程师根据调查结果执行恢复并验证业务。
+**让 AI Agent 协助 SRE 排查 Kubernetes 服务故障。** Agent 读取工作负载、服务路由和网关日志，分析故障证据、辅助定位错误；工程师根据调查结果执行恢复并验证业务。
 
 基于 HolmesGPT 的 AI SRE 故障调查工作台。重点解决的问题：**Pod 看起来正常，业务接口却失败时，如何从 Kubernetes 资源和日志中找到真正的故障点？**
 
 ## 项目故事
 
-业务接口报错时，Pod 仍可能显示 Ready。这个项目把调查拆成可复核的证据：先比较 Pod 标签、Service Selector 和 EndpointSlice，再根据需要读取网关日志。Agent 给出分析，工程师决定是否恢复并检查业务结果。
+Pod 处于 Ready 状态时，业务接口仍可能失败。本项目围绕 Pod 标签、Service Selector、EndpointSlice 和网关日志组织调查证据，让工程师能够对照服务路由定位问题。调查工具限定为只读，故障恢复由工程师控制。
 
-案例记录中，T1 的 Selector 与 Pod 标签不匹配；T3 则是网关健康检查正常，但代理的上游端口填错。T3 的原工具组合只能缩小范围，增加网关日志工具后，记录显示模型能够对照日志中的 81 和 Service 的 80。这里展示的是**补齐取证工具对定位的帮助**，不能据此声称经过统计验证的提速比例。
-
-面试时可以沿着「故障现象 → 哪个证据缺失 → 如何补工具 → 权限和人工恢复边界 → 怎样复现」讲清楚。历史案例已有调查摘要，原始终端记录未随仓库发布。本轮在 VMware 集群的独立命名空间验证了受限身份、18 项权限拒绝以及 T1/T3 注入和恢复；[结果和范围](evidence/kubernetes-smoke.json)说明了单节点运行的适配。
-
-随后在故障保持期间，使用 HolmesGPT 0.43.0 和本地 Magpie 模型调查，两次均调用三个受限只读工具并指出对应原因；[调查证据](evidence/holmes-model-investigations.json)记录了调用、关键数据和恢复。该次实验通过 Windows 兼容桥接与 SSH 执行取证，没有运行 Linux 原生调查钩子或 GitHub Actions；每种故障只有一次新调查，不能据此推断统计准确率。
-
-后来将 Windows 桥接参数化并补入项目，又在隔离命名空间复测了 T1/T3；[复测证据](evidence/windows-bridge-reproduction.json)记录了脚本哈希、工具和恢复结果。T1 使用交付的等待钩子，T3 使用等价的临时等待钩子；这仍不是统计准确率测试。
-
-远端 CI 首次运行后，复现脚本增加了 504 兼容和失败诊断，两个调查钩子的 T3 故障描述也改为更准确的 5xx。既有实验记录保留当时的脚本哈希，不冒充是在修改后重新执行。
-
-上述改动后，以当前脚本在新的隔离命名空间重新进行了 [T1/T3 真实模型调查](evidence/windows-bridge-current-reproduction.json)：两次都使用交付的等待钩子和 Windows 桥接，三个只读工具成功执行，模型指出相应原因，释放后业务恢复。该记录包含源码哈希和清理范围；它仍是每种故障各一次的合成场景，不代表生产准确率。Linux 原生调查钩子没有在这次运行中验收。
-
-之后在 VMware 的 Linux 节点上，使用 HolmesGPT 0.43.0 和本地模拟模型服务[验证了调查入口的工具白名单](evidence/linux-holmes-guard-fake-model.json)：允许的工具被正确传递，多余工具和修改后的配置会在模型请求前被拒绝。该测试只运行从钩子提取的 Python 部分，未执行完整 Shell 钩子、访问 Kubernetes 或调用真实模型；本机 Magpie 仅监听 Windows 回环地址，Linux 原生真实调查仍未验收。
-
-随后在 GitHub 托管的隔离 kind 集群，以真实本地 Qwen2.5-7B 模型首次运行了 [Linux 原生调查钩子](evidence/hosted-linux-real-model-initial.json)。T1/T3 均调用了三个只读工具，但工具结果返回后的请求超过模型服务的 8192 Token 上下文，两次调查均失败，没有得到可核实的最终根因。两次故障均恢复、隔离集群已删除；这是合成实验，不代表生产准确率。
-
-精简路由证据并增加上下文后[重新运行](evidence/hosted-linux-real-model-compact.json)：路由输出由约 27 KB 降到约 1.2–1.5 KB，本次未出现上下文超限。T1 在 300 秒时限内未完成；T3 返回了回答，但没有对照日志端口 81 和 Service 端口 80，未达到根因验收。两次故障均恢复，隔离集群已删除；这仍不是独立人工 UAT。
-
-将隔离实验的钩子时限调整为 600 秒后，第三轮 [Linux 原生调查](evidence/hosted-linux-real-model-longer.json)的两个钩子均完成，但模型仍未正确定位：T1 错称 selector 与 Pod 标签匹配；T3 未对照 81 与 80，并建议调整超时。两次故障均已恢复，该建议没有执行。工作流成功只表示实验和恢复步骤完成，**不表示模型根因判断通过**。
-
-补充 Service ClusterIP 和确定性标签匹配证据后的[第四轮调查](evidence/hosted-linux-real-model-grounded.json)中，T1 模型指出错误 selector 未匹配 Pod，并将配置或标签错误列为可能原因；T3 仍未识别 81 与 80 的端口差异。两次均恢复；每个场景只有一次此次运行，尚需独立人工复核，不能推断准确率。
-
-增加网关日志与当前 Service 端口对照后的[第五轮调查](evidence/hosted-linux-real-model-correlated.json)中，两个钩子均完成且故障恢复，但**两次模型根因判断均未通过**：T1 错称 selector 匹配 Pod；T3 虽提到上游端口 81，却没有与 Service 的 80 对照。工具实际返回了标签匹配数为 0 和 81/80 不一致的线索，模型没有正确采用。日志是历史记录、Service 是后续快照，端口关联本身不证明根因。每个场景仅一次合成实验，独立人工复核尚未完成，工作流成功不能当作诊断成功。
-
-托管实验产物只适用于合成集群：日志中的地址替换是尽力处理，无法保证覆盖跨多行地址，也可能误替换相邻数字；不要把这套日志导出流程直接用于真实集群或敏感数据。
-
-复测中，模型虽被要求不提出修改，仍在文字中给出了修复建议；这些建议没有被执行。实际权限由只读工具和 Kubernetes RBAC 约束，恢复由操作者执行。
-
-上述 Kubernetes 实验之后，复现脚本增加了调查钩子的上下文一致性检查。原证据保留当时的源码哈希；新版本已在同一隔离命名空间复验 T1/T3 和恢复，[新证据](evidence/context-hook-smoke.json)记录了上下文拒绝与测试钩子结果。该钩子没有调用模型。
+T1 演示 Service Selector 与 Pod 标签不匹配；T3 演示网关上游端口与 Service 端口不一致。项目在隔离环境中验证了受限身份、18 项权限拒绝及故障恢复，详见 [Kubernetes 验证记录](evidence/kubernetes-smoke.json)和[模型调查记录](evidence/windows-bridge-current-reproduction.json)。托管环境的[最新模型调查](evidence/hosted-linux-real-model-correlated.json)中，T1/T3 的模型判断均未通过；工具线索、模型判断摘要与恢复结果均已保留，便于复核。
 
 ## 故障调查流程
 
@@ -57,9 +29,9 @@ HolmesGPT → namespace 限定的只读取证工具 → Kubernetes API / 网关�
 
 实验环境：Kubernetes v1.36.4、HolmesGPT v0.43.0、Nginx 1.25，命名空间为 `incident-lab`。Agent 仅调查，故障注入和恢复由人工执行。
 
-## 真实故障案例
+## 故障案例
 
-| 案例 | 故障现象 | Agent 调查结果 |
+| 案例 | 故障现象 | 关键线索 |
 |---|---|---|
 | [T1：Service Selector 不匹配](docs/t1-investigation.md) | Pod Ready，但 Service 没有可用后端 | 根据 Pod 标签、Service Selector、EndpointSlice 定位匹配错误 |
 | [T3：Gateway 上游端口错误](docs/t3-investigation.md) | `/healthz` 为 200，`/api/` 为 502 | 原有工具仅定位故障范围；增加日志工具后识别端口 81 与 Service 端口 80 不匹配 |
@@ -88,7 +60,7 @@ kind create cluster --name incident-workbench
 bash scripts/smoke.sh --context kind-incident-workbench
 ```
 
-这一步不调用 LLM。它用短期 ServiceAccount 凭据执行取证并验证禁止权限，再检查 T1 的 EndpointSlice 无可用后端、T3 的 Nginx 日志出现错误端口，以及两次恢复后 `/api/` 均返回 200。[CI 配置](.github/workflows/incident-lab.yml)在独立 kind 集群执行同一脚本；相同版本和镜像的[本地 kind 验证](evidence/kind-workflow-local.json)已通过。首次 [GitHub Actions 运行](https://github.com/wanghaibing07/aisre-incident-workbench/actions/runs/43909333677)在 T3 未观察到预期状态而失败；增加 504 兼容和同一请求的日志证据检查后，[后续运行](https://github.com/wanghaibing07/aisre-incident-workbench/actions/runs/43911969837)通过，实际观察到 504。首次失败的具体状态未记录，不能据此断言当时也是 504。复用已部署的实验环境时也可以单独运行 `bash scripts/verify-rbac.sh --context kind-incident-workbench`。
+该检查使用短期 ServiceAccount 凭据验证权限、T1 的 EndpointSlice、T3 的网关日志和恢复后的业务接口，不调用模型。[CI 配置](.github/workflows/incident-lab.yml)使用独立 kind 集群；[本地验证记录](evidence/kind-workflow-local.json)和[历史实验](evidence/)可供复核。已有实验环境中也可单独运行 `bash scripts/verify-rbac.sh --context kind-incident-workbench`。
 
 错误上游连接被立即拒绝时可能返回 502，超时时可能返回 504；复现脚本接受两者，同时必须在本次请求对应的网关日志中观察到错误的 81 端口。此前实验记录的是实际出现的 502。
 

@@ -12,5 +12,5 @@
     {"case": "t3", "fault_http_status": 504, "fault_evidence": "gateway log reported upstream port 81", "completed_readonly_tools": 3, "route_tool_output_characters": 27887, "failed_request_tokens": 11778, "configured_context_tokens": 8192, "error": "ContextWindowExceededError", "recovery": "healthz and api returned 200; separate config, endpoints and rollout checks passed"}
   ],
   "cleanup": "GitHub Actions recorded successful isolated kind cluster deletion.",
-  "limitations": ["Neither investigation produced a final root-cause answer.", "Large raw route evidence contributed to the context budget issue; its measured size alone does not prove it was the only cause.", "Synthetic scenarios only; no independent human UAT or production accuracy claim.", "Sanitized run artifacts were configured for seven days of retention; this compact record preserves the failure measurements."]
+  "limitations": ["Neither investigation produced a final root-cause answer.", "Large raw route evidence contributed to the context budget issue; its measured size alone does not prove it was the only cause.", "Synthetic scenarios only; no production accuracy claim.", "Sanitized run artifacts were configured for seven days of retention; this compact record preserves the failure measurements."]
 }

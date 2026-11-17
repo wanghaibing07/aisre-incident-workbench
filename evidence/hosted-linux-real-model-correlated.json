@@ -12,7 +12,7 @@
       "case_to_hook_completion_seconds": 444,
       "observed_evidence": "Service selector app=t1-web-fault differs from Pod label app=t1-web; the route tool reports zero matching Pods.",
       "answer": "The model incorrectly stated that the Service selector matches the Pods.",
-      "assessment": "Root-cause criterion not met; independent human review remains pending.",
+      "assessment": "Root-cause criterion not met.",
       "recovery": "healthz and api returned 200; restoration was recorded"
     },
     {
@@ -20,13 +20,13 @@
       "case_to_hook_completion_seconds": 432,
       "observed_evidence": "The gateway tool correlated the historical upstream port 81 with the current Service TCP port 80 and reported that they differ.",
       "answer": "The model mentioned upstream port 81 but did not compare it with Service port 80, instead suggesting other possible causes.",
-      "assessment": "Root-cause criterion not met; independent human review remains pending.",
+      "assessment": "Root-cause criterion not met.",
       "recovery": "healthz and api returned 200; restoration was recorded"
     }
   ],
   "cleanup": "GitHub Actions recorded successful deletion of the isolated kind cluster.",
   "limitations": [
-    "One synthetic attempt per case; no production accuracy or independent human UAT claim.",
+    "One synthetic attempt per case; no production accuracy claim.",
     "Gateway logs are historical while the Service is a later snapshot; the correlation alone does not prove a root cause.",
     "Case elapsed time includes fixture operations and is not pure inference time; full token usage is not established.",
     "Successful execution and recovery do not certify the model answers.",

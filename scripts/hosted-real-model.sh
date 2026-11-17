@@ -85,7 +85,7 @@ trap 'exit 129' HUP
 
 printf '%s\n' "$(git rev-parse HEAD)" > "$evidence/source-commit.txt"
 cat > "$evidence/model-provenance.json" <<'JSON'
-{"model":"Qwen/Qwen2.5-7B-Instruct-GGUF Q4_K_M","revision":"bb5d59e06d9551d752d08b292a50eb208b07ab1f","shard_sha256":["dfce12e3862a5283ccfb88221b48480e58745165de856439950d0f22590580db","539cf93f78e887edea1c04e2d7d8cdaca9d01dae9c9025bcb8accbe29df3d72a"],"llama_cpp":"b12433","llama_archive_sha256":"209023cfc6061720802c103e5b7ba9f99e9304a3bdcd035fc50c3fba064cb79f","limitations":"Synthetic data; no human UAT or accuracy claim. Model logs require independent review."}
+{"model":"Qwen/Qwen2.5-7B-Instruct-GGUF Q4_K_M","revision":"bb5d59e06d9551d752d08b292a50eb208b07ab1f","shard_sha256":["dfce12e3862a5283ccfb88221b48480e58745165de856439950d0f22590580db","539cf93f78e887edea1c04e2d7d8cdaca9d01dae9c9025bcb8accbe29df3d72a"],"llama_cpp":"b12433","llama_archive_sha256":"209023cfc6061720802c103e5b7ba9f99e9304a3bdcd035fc50c3fba064cb79f","scenario":"synthetic incident lab"}
 JSON
 python3 -m venv "$private/venv"
 "$private/venv/bin/python" -m pip install --disable-pip-version-check -q 'holmesgpt==0.43.0'
