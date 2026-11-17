@@ -1,7 +1,7 @@
 # AI SRE 案例 T1：Service Selector 不匹配
 
 ## 故障场景
-Kubernetes namespace：incident-lab
+Kubernetes 实验命名空间：`incident-lab` 的隔离副本
 
 - Deployment：t1-web
 - Pod 标签：app=t1-web
@@ -12,10 +12,11 @@ Kubernetes namespace：incident-lab
 
 ## HolmesGPT 调查
 
-Agent 自主调用两个只读工具：
+在一次使用 Magpie `workbuddy/glm-5.3-flash` 的调查中，Agent 调用了三个只读工具：
 
 1. incident_lab_pod_snapshot
 2. incident_lab_service_route_evidence
+3. incident_lab_gateway_error_logs
 
 调查发现：
 - Pod 本身正常
@@ -23,15 +24,14 @@ Agent 自主调用两个只读工具：
 - EndpointSlice 缺少后端
 
 Agent 正确定位 Service 选择器错误。
-调查期间未执行资源修改。
+Agent 调查期间未修改资源。
 
-## 人工恢复
+## 恢复
 - 将 Service Selector 恢复为 app=t1-web
 - EndpointSlice 恢复可用后端
 - HTTP 请求恢复为 200
 
 ## 结论
-T1 可以通过 Kubernetes 资源状态完成故障定位，
-不需要额外增加日志取证工具。
+T1 的关键线索来自 Kubernetes 资源状态；本次调查也读取了网关日志。
 
-本文件为实验结果摘要，原始终端调查记录尚未作为附件发布。
+[模型调查记录](../evidence/holmes-model-investigations.json)包含脱敏后的关键工具证据和回答；[交付脚本复测](../evidence/windows-bridge-current-reproduction.json)也记录了调查和恢复结果。另一次 [Linux 原生调查](../evidence/hosted-linux-real-model-correlated.json)中，Qwen2.5-7B 将不匹配的选择器误判为匹配，未达到根因判断标准。

@@ -13,7 +13,7 @@ T1 演示 Service Selector 与 Pod 标签不匹配；T3 演示网关上游端口
 ## 故障调查流程
 
 ```text
-业务请求异常 → Agent 只读取证 → 对照服务路由与日志 → 定位故障 → 人工恢复 → HTTP 验证
+业务请求异常 → Agent 只读取证 → 对照服务路由与日志 → 辅助定位 → 工程师控制恢复 → HTTP 验证
 ```
 
 AI SRE 在本项目中的实际能力是**辅助故障诊断**：自动调查、证据关联和原因判断；变更与恢复仍由工程师执行。
@@ -27,16 +27,16 @@ AI SRE 在本项目中的实际能力是**辅助故障诊断**：自动调查、
 HolmesGPT → namespace 限定的只读取证工具 → Kubernetes API / 网关日志
 ```
 
-实验环境：Kubernetes v1.36.4、HolmesGPT v0.43.0、Nginx 1.25，命名空间为 `incident-lab`。Agent 仅调查，故障注入和恢复由人工执行。
+实验环境：Kubernetes v1.36.4、HolmesGPT v0.43.0、Nginx 1.25，命名空间为 `incident-lab` 或独立副本。Agent 负责调查；工程师控制故障注入与恢复脚本。
 
 ## 故障案例
 
 | 案例 | 故障现象 | 关键线索 |
 |---|---|---|
 | [T1：Service Selector 不匹配](docs/t1-investigation.md) | Pod Ready，但 Service 没有可用后端 | 根据 Pod 标签、Service Selector、EndpointSlice 定位匹配错误 |
-| [T3：Gateway 上游端口错误](docs/t3-investigation.md) | `/healthz` 为 200，`/api/` 为 502 | 原有工具仅定位故障范围；增加日志工具后识别端口 81 与 Service 端口 80 不匹配 |
+| [T3：Gateway 上游端口错误](docs/t3-investigation.md) | `/healthz` 为 200，`/api/` 为 502 | 对照日志中的上游端口 81 和 Service 端口 80 |
 
-T3 的两轮调查使用相同故障描述，Agent 自主调用工具。**增强前只判断问题范围，增强后通过日志与 Service 端口对照识别具体错误。** 人工恢复配置后，业务返回 HTTP 200。
+在一次使用 Magpie 模型的调查中，Agent 结合日志与 Service 信息识别出 T3 的端口不匹配；恢复配置后业务返回 HTTP 200。另一轮 Linux 原生调查未达到根因判断标准，两次结果分别记录在案例中。
 
 [查看技术复盘与对照结果](docs/technical-report.md)
 
