@@ -123,7 +123,7 @@ env -i PATH="$PATH" HOME="$private/home" LANG=C.UTF-8 LD_LIBRARY_PATH="$private/
   bash -c 'ulimit -v 12582912; exec "$@"' _ "$private/llama-b12433/llama-server" \
   --offline --model "$private/qwen2.5-7b-instruct-q4_k_m-00001-of-00002.gguf" \
   --alias qwen2.5-7b --host 127.0.0.1 --port "$port" --api-key-file "$key_file" \
-  --n-gpu-layers 0 --ctx-size 8192 --threads 4 --threads-batch 4 --parallel 1 --no-warmup --jinja \
+  --n-gpu-layers 0 --ctx-size 16384 --threads 4 --threads-batch 4 --parallel 1 --no-warmup --jinja \
   > "$private/model.log" 2>&1 &
 model_pid=$!
 for _ in {1..180}; do

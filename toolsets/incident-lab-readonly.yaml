@@ -16,10 +16,63 @@ toolsets:
 
         '
     - name: incident_lab_service_route_evidence
-      description: Read Pod labels, Service selectors and EndpointSlice addresses
-        in incident-lab. Fixed read-only namespace; no parameters.
-      command: kubectl --request-timeout=10s -n incident-lab get pods,services,endpointslices
-        -o json
+      description: Read compact Pod labels and readiness, Service selectors and ports,
+        and EndpointSlice addresses, conditions and ports in incident-lab. Fixed
+        read-only namespace; no parameters. Missing fields are not inferred.
+      command: |
+        python3 -c '
+        import json, subprocess
+        raw = subprocess.run(["kubectl", "--request-timeout=10s", "-n", "incident-lab", "get", "pods,services,endpointslices", "-o", "json"], stdout=subprocess.PIPE, text=True, check=True)
+        data = json.loads(raw.stdout)
+        if not isinstance(data, dict) or not isinstance(data.get("items"), list):
+            raise ValueError("Expected a Kubernetes resource list")
+        result = {"namespace": "incident-lab", "pods": [], "services": [], "endpoint_slices": []}
+        def fields(value, names):
+            if value is None:
+                return None
+            if not isinstance(value, dict):
+                raise ValueError("Expected a Kubernetes object")
+            return {name: value[name] for name in names if name in value}
+        def ports(value, names):
+            if value is None:
+                return None
+            if not isinstance(value, list):
+                raise ValueError("Expected a port list")
+            return [fields(port, names) for port in value]
+        for item in data["items"]:
+            if not isinstance(item, dict):
+                raise ValueError("Expected a Kubernetes resource")
+            kind = item.get("kind")
+            meta = item.get("metadata") or {}
+            if kind == "Pod":
+                status = item.get("status") or {}
+                conditions = status.get("conditions") or []
+                ready = next((condition.get("status") for condition in conditions if condition.get("type") == "Ready"), None)
+                result["pods"].append({"name": meta.get("name"), "labels": meta.get("labels"),
+                                       "phase": status.get("phase"), "ready": ready})
+            elif kind == "Service":
+                spec = item.get("spec") or {}
+                result["services"].append({"name": meta.get("name"), "selector": spec.get("selector"),
+                                           "ports": ports(spec.get("ports"), ("name", "protocol", "port", "targetPort", "nodePort", "appProtocol"))})
+            elif kind == "EndpointSlice":
+                endpoints = item.get("endpoints")
+                if endpoints is not None and not isinstance(endpoints, list):
+                    raise ValueError("Expected an endpoint list")
+                result["endpoint_slices"].append({
+                    "name": meta.get("name"), "labels": meta.get("labels"), "address_type": item.get("addressType"),
+                    "ports": ports(item.get("ports"), ("name", "protocol", "port", "appProtocol")),
+                    "endpoints": None if endpoints is None else [
+                        {"addresses": endpoint.get("addresses"),
+                         "conditions": fields(endpoint.get("conditions"), ("ready", "serving", "terminating")),
+                         "target_ref": fields(endpoint.get("targetRef"), ("kind", "namespace", "name")),
+                         "node_name": endpoint.get("nodeName"), "zone": endpoint.get("zone")}
+                        for endpoint in endpoints
+                    ],
+                })
+            else:
+                raise ValueError("Unexpected resource kind: " + str(kind))
+        print(json.dumps(result, ensure_ascii=False, separators=(",", ":")))
+        '
     - name: incident_lab_gateway_error_logs
       description: "Read recent Nginx logs of t3-gateway in incident-lab. Use to investigate upstream connection failures and the actual upstream port. Fixed namespace, no parameters, read-only."
       command: "kubectl --request-timeout=10s -n incident-lab logs deployment/t3-gateway --since=15m --tail=80 --timestamps"

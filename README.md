@@ -22,6 +22,8 @@
 
 之后在 VMware 的 Linux 节点上，使用 HolmesGPT 0.43.0 和本地模拟模型服务[验证了调查入口的工具白名单](evidence/linux-holmes-guard-fake-model.json)：允许的工具被正确传递，多余工具和修改后的配置会在模型请求前被拒绝。该测试只运行从钩子提取的 Python 部分，未执行完整 Shell 钩子、访问 Kubernetes 或调用真实模型；本机 Magpie 仅监听 Windows 回环地址，Linux 原生真实调查仍未验收。
 
+随后在 GitHub 托管的隔离 kind 集群，以真实本地 Qwen2.5-7B 模型首次运行了 [Linux 原生调查钩子](evidence/hosted-linux-real-model-initial.json)。T1/T3 均调用了三个只读工具，但工具结果返回后的请求超过模型服务的 8192 Token 上下文，两次调查均失败，没有得到可核实的最终根因。两次故障均恢复、隔离集群已删除；这是合成实验，不代表生产准确率。
+
 复测中，模型虽被要求不提出修改，仍在文字中给出了修复建议；这些建议没有被执行。实际权限由只读工具和 Kubernetes RBAC 约束，恢复由操作者执行。
 
 上述 Kubernetes 实验之后，复现脚本增加了调查钩子的上下文一致性检查。原证据保留当时的源码哈希；新版本已在同一隔离命名空间复验 T1/T3 和恢复，[新证据](evidence/context-hook-smoke.json)记录了上下文拒绝与测试钩子结果。该钩子没有调用模型。

@@ -1,0 +1,16 @@
+{
+  "run_url": "https://github.com/wanghaibing07/aisre-incident-workbench/actions/runs/43983848047",
+  "tested_commit": "473b034780e774595901ac7c6aa9efdbb7e3d9b2",
+  "result": "failed",
+  "environment": "GitHub-hosted Ubuntu 24.04, isolated kind cluster, Linux native HolmesGPT 0.43.0, local Qwen2.5-7B-Instruct Q4_K_M via llama.cpp b12433 on loopback",
+  "versions": {"python": "3.12.3", "holmesgpt": "0.43.0", "litellm": "1.89.0", "openai": "2.54.0", "httpx": "0.28.1"},
+  "model_sha256": ["dfce12e3862a5283ccfb88221b48480e58745165de856439950d0f22590580db", "539cf93f78e887edea1c04e2d7d8cdaca9d01dae9c9025bcb8accbe29df3d72a"],
+  "llama_archive_sha256": "209023cfc6061720802c103e5b7ba9f99e9304a3bdcd035fc50c3fba064cb79f",
+  "preflight": "The actual model returned a pod snapshot tool call with empty arguments; unauthenticated access was rejected with 401.",
+  "cases": [
+    {"case": "t1", "fault_http_status": 502, "completed_readonly_tools": 3, "route_tool_output_characters": 27066, "failed_request_tokens": 12950, "configured_context_tokens": 8192, "error": "ContextWindowExceededError", "recovery": "healthz and api returned 200; separate selector, endpoints and rollout checks passed"},
+    {"case": "t3", "fault_http_status": 504, "fault_evidence": "gateway log reported upstream port 81", "completed_readonly_tools": 3, "route_tool_output_characters": 27887, "failed_request_tokens": 11778, "configured_context_tokens": 8192, "error": "ContextWindowExceededError", "recovery": "healthz and api returned 200; separate config, endpoints and rollout checks passed"}
+  ],
+  "cleanup": "GitHub Actions recorded successful isolated kind cluster deletion.",
+  "limitations": ["Neither investigation produced a final root-cause answer.", "Large raw route evidence contributed to the context budget issue; its measured size alone does not prove it was the only cause.", "Synthetic scenarios only; no independent human UAT or production accuracy claim.", "Sanitized run artifacts were configured for seven days of retention; this compact record preserves the failure measurements."]
+}
