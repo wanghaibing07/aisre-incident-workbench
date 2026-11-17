@@ -6,13 +6,13 @@
 
 ## 调查和关键证据
 
-在 Kubernetes v1.36.4 的隔离实验命名空间中，HolmesGPT 0.43.0 通过三个只读工具查询 Pod、Service 路由和网关日志。一次使用 Magpie `workbuddy/glm-5.3-flash` 的调查给出了以下线索：
+在 Kubernetes v1.36.4 的隔离实验命名空间中，HolmesGPT 0.43.0 通过三个只读工具查询 Pod、Service 路由和网关日志。一次使用 Magpie `workbuddy/glm-5.3-flash` 的调查给出了以下线索（根据[同一次记录](../evidence/holmes-model-investigations.json)整理）：
 
 - Nginx 错误日志中的上游地址使用端口 **81**。
 - Service `t1-web` 暴露端口 **80**，EndpointSlice 有可用后端。
 - 模型对照两者后指出端口不匹配，并未直接读取 Nginx 配置。
 
-工程师控制恢复流程，将网关配置恢复为端口 80 并重建 Gateway Pod；`/healthz` 和 `/api/` 均恢复为 200。[模型回答及脱敏关键证据](../evidence/holmes-model-investigations.json)与[交付脚本复测记录](../evidence/windows-bridge-current-reproduction.json)可供查看。
+工程师控制恢复流程；记录显示恢复后 `/healthz` 和 `/api/` 均为 200。[模型回答及脱敏关键证据](../evidence/holmes-model-investigations.json)与另一次[交付脚本复测记录](../evidence/windows-bridge-current-reproduction.json)可供查看。
 
 ## 不同调查结果
 

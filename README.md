@@ -36,7 +36,22 @@ HolmesGPT → namespace 限定的只读取证工具 → Kubernetes API / 网关�
 | [T1：Service Selector 不匹配](docs/t1-investigation.md) | Pod Ready，但 Service 没有可用后端 | 根据 Pod 标签、Service Selector、EndpointSlice 定位匹配错误 |
 | [T3：Gateway 上游端口错误](docs/t3-investigation.md) | `/healthz` 为 200，`/api/` 为 502 | 对照日志中的上游端口 81 和 Service 端口 80 |
 
-在一次使用 Magpie 模型的调查中，Agent 结合日志与 Service 信息识别出 T3 的端口不匹配；恢复配置后业务返回 HTTP 200。另一轮 Linux 原生调查未达到根因判断标准，两次结果分别记录在案例中。
+### 一次调查：健康检查正常，业务接口失败
+
+下图根据一次 [T3 模型调查记录](evidence/holmes-model-investigations.json)整理：
+
+```mermaid
+flowchart LR
+    request["业务请求 /api/"] --> gateway["Nginx Gateway<br/>/healthz：200<br/>/api/：502"]
+    gateway -. "上游 :81 ≠ Service :80" .-> service["Service t1-web<br/>服务端口 80"]
+    service --> pod["Web Pod<br/>1 个就绪端点"]
+    agent["HolmesGPT + Magpie"] -. "读取网关日志" .-> gateway
+    agent -. "对照 Service 和端点" .-> service
+```
+
+**调查结果：**模型指出网关上游端口 81 与 Service 端口 80 不匹配。恢复后，`/healthz` 和 `/api/` 均返回 200。
+
+另一轮 [Linux 原生调查](evidence/hosted-linux-real-model-correlated.json)未达到根因判断标准；不同调查的结果分别保留在案例中。
 
 [查看技术复盘与对照结果](docs/technical-report.md)
 
@@ -127,4 +142,4 @@ bash "$LAB_DIR/scripts/reproduce.sh" --context "$LAB_CONTEXT" --case t3 --on-fau
 
 ## 设计重点
 
-复用 HolmesGPT 进行调查；围绕 T3 故障补充 Nginx 日志取证工具，使 Agent 从定位异常链路进一步识别错误端口。调查权限限定为只读，恢复操作由工程师控制。
+复用 HolmesGPT 进行调查，并补充 Nginx 日志取证工具。在上面的 T3 调查中，Agent 结合日志和 Service 信息指出了端口不匹配。调查权限限定为只读，恢复操作由工程师控制。
