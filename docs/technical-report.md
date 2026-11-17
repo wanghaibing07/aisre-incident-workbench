@@ -21,6 +21,10 @@ Pod Ready，但 Service Selector 与 Pod 标签不一致，EndpointSlice 无可�
 
 [详细调查](t3-investigation.md) · [自定义工具](../toolsets/incident-lab-readonly.yaml)
 
+## 托管环境复测
+
+在提交 `7d01d46` 的一次 Linux 原生复测中，Qwen2.5-7B 完成工具调用后，T1 和 T3 调查均在 600 秒时超时，未产出最终回答。日志显示模型处理较长输入耗时较高，但不能单凭此次记录确定超时的唯一原因。两次故障均已恢复，`/healthz` 和 `/api/` 返回 200；[复测记录](../evidence/hosted-linux-timeout-failure.json)保留了运行版本和范围。
+
 ## 技术取舍与边界
 
 - 复用成熟 Agent，仅补充真正缺少的日志取证能力。

@@ -24,6 +24,6 @@
   "limitations": [
     "The model answers were not produced before the hook timeout; no root-cause accuracy assessment is possible for this run.",
     "One synthetic attempt per case; this is an execution-boundary observation, not a statistical result.",
-    "The GitHub runner CPU was sufficient for preflight but too slow for the later larger investigation prompts within 600 seconds."
+    "The preflight passed; the model log shows substantial time processing larger investigation prompts, but does not establish the sole cause of the timeouts."
   ]
 }
