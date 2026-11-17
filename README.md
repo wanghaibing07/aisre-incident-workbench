@@ -10,6 +10,8 @@ Pod 处于 Ready 状态时，业务接口仍可能失败。本项目围绕 Pod �
 
 T1 演示 Service Selector 与 Pod 标签不匹配；T3 演示网关上游端口与 Service 端口不一致。项目在隔离环境中验证了受限身份、18 项权限拒绝及故障恢复，详见 [Kubernetes 验证记录](evidence/kubernetes-smoke.json)和[模型调查记录](evidence/windows-bridge-current-reproduction.json)。托管环境的[最新模型调查](evidence/hosted-linux-real-model-correlated.json)中，T1/T3 的模型判断均未通过；工具线索、模型判断摘要与恢复结果均已保留，便于复核。
 
+另一次当前提交的托管复测（[7d01d46](evidence/hosted-linux-timeout-failure.json)）在 GitHub runner 上因 Qwen2.5-7B 推理过慢触发 600 秒调查钩子超时；两次故障均在超时后被独立恢复并验证 HTTP 200。该记录保留为复现边界证据，不统计模型准确率。
+
 ## 故障调查流程
 
 ```text

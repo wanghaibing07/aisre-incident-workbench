@@ -1,0 +1,29 @@
+{
+  "run_url": "https://github.com/wanghaibing07/aisre-incident-workbench/actions/runs/44050136041",
+  "tested_commit": "7d01d4677b1c2bc81f47b32e3ea00b690b6dbf36",
+  "workflow_execution": "failure",
+  "environment": "GitHub-hosted Ubuntu 24.04, isolated kind cluster, Linux native HolmesGPT 0.43.0, local Qwen2.5-7B-Instruct Q4_K_M via llama.cpp b12433 on loopback",
+  "context_tokens": 16384,
+  "hook_timeout_seconds": 600,
+  "preflight": "The model called the pod snapshot tool with empty arguments; an unauthenticated request was rejected with 401.",
+  "cases": [
+    {
+      "case": "t1",
+      "observed_evidence": "The T1 fault was injected and the smoke checks confirmed a ready Pod with zero ready endpoints.",
+      "hook_result": "timed out after 600 seconds while HolmesGPT was still processing the investigation",
+      "recovery": "The reproduce script terminated the hook and independently restored and verified /healthz=200 and /api/=200."
+    },
+    {
+      "case": "t3",
+      "observed_evidence": "The T3 fault was injected and the gateway log showed upstream port 81.",
+      "hook_result": "timed out after 600 seconds while HolmesGPT was still processing the investigation",
+      "recovery": "The reproduce script terminated the hook and independently restored and verified /healthz=200 and /api/=200."
+    }
+  ],
+  "cleanup": "GitHub Actions recorded successful deletion of the isolated kind cluster.",
+  "limitations": [
+    "The model answers were not produced before the hook timeout; no root-cause accuracy assessment is possible for this run.",
+    "One synthetic attempt per case; this is an execution-boundary observation, not a statistical result.",
+    "The GitHub runner CPU was sufficient for preflight but too slow for the later larger investigation prompts within 600 seconds."
+  ]
+}
