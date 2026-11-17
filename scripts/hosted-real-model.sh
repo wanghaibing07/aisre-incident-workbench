@@ -246,8 +246,8 @@ fi
 failed=0
 for scenario in t1 t3; do
   event "$scenario" started
-  if clean_command timeout --signal=TERM --kill-after=180s 600s bash scripts/reproduce.sh --context "$context" \
-       --case "$scenario" --on-fault scripts/investigate.sh > "$private/$scenario.log" 2>&1; then
+  if clean_command timeout --signal=TERM --kill-after=180s 900s bash scripts/reproduce.sh --context "$context" \
+       --case "$scenario" --on-fault scripts/investigate.sh --hook-timeout 600 > "$private/$scenario.log" 2>&1; then
     event "$scenario" hook_completed_needs_human_review
   else
     event "$scenario" hook_failed

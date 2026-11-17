@@ -1,0 +1,14 @@
+{
+  "run_url": "https://github.com/wanghaib07/aisre-incident-workbench/actions/runs/43986470806",
+  "tested_commit": "ee715b557fcf9e893a01153e10a9031c1e8dfbea",
+  "result": "failed",
+  "environment": "GitHub-hosted Ubuntu 24.04, isolated kind cluster, Linux native HolmesGPT 0.43.0, local Qwen2.5-7B-Instruct Q4_K_M via llama.cpp b12433 on loopback",
+  "context_tokens": 16384,
+  "preflight": "The model called the pod snapshot tool with empty arguments; unauthenticated access was rejected with 401.",
+  "cases": [
+    {"case": "t1", "completed_readonly_tools": 3, "route_tool_output_characters": 1236, "previous_route_tool_output_characters": 27066, "result": "Hook timed out after 300 seconds; no final root-cause answer was recorded.", "recovery": "healthz and api returned 200; independent recovery checks passed"},
+    {"case": "t3", "completed_readonly_tools": 3, "route_tool_output_characters": 1501, "previous_route_tool_output_characters": 27887, "case_to_hook_completion_seconds": 297, "result": "The answer cited an upstream connection timeout on port 81 but did not compare it with the Service port 80; it suggested load, network, or service configuration instead. Root-cause acceptance was not met.", "recovery": "healthz and api returned 200; independent recovery checks passed"}
+  ],
+  "cleanup": "GitHub Actions recorded successful isolated kind cluster deletion.",
+  "limitations": ["No context overflow was observed in this run; that does not prove it cannot occur in other cases.", "Elapsed case time is not pure model inference time; complete token usage cannot be reconstructed from the logs.", "Synthetic cases only, one run per case, and AI-assisted review is not independent human UAT.", "Sanitized run artifacts were configured for seven days of retention."]
+}

@@ -20,6 +20,8 @@ SERVICE = "service/t1-web"
 CONFIG = "configmap/t3-gateway-config"
 OWNER = "incident-lab/reproduction-run"
 UPSTREAM = "proxy_pass http://t1-web.incident-lab.svc.cluster.local:80/;"
+DEFAULT_HOOK_TIMEOUT = 300
+MAX_HOOK_TIMEOUT = 900
 
 
 def require(condition, message):
@@ -78,7 +80,7 @@ def stop_hook(process, grace):
     process.wait(timeout=5)
 
 
-def run_fault_hook(hook, case, context, timeout=300, grace=3):
+def run_fault_hook(hook, case, context, timeout=DEFAULT_HOOK_TIMEOUT, grace=3):
     require(os.name == "posix", "--on-fault requires POSIX Python")
     command = [hook, case]
     with defer_interrupts() as received:
@@ -267,7 +269,11 @@ class Lab:
         poll(lambda: log_evidence()[1], "Nginx did not log an upstream port 81 error for this run")
         print(f"T3: /healthz=200 /api/={status}, Nginx evidence shows upstream port 81", flush=True)
 
-    def reproduce(self, case, hook):
+    def reproduce(self, case, hook, hook_timeout=DEFAULT_HOOK_TIMEOUT):
+        if type(hook_timeout) is not int or not 1 <= hook_timeout <= MAX_HOOK_TIMEOUT:
+            raise ValueError("Hook timeout must be an integer from 1 to 900 seconds")
+        if not hook and hook_timeout != DEFAULT_HOOK_TIMEOUT:
+            raise ValueError("A custom hook timeout requires a fault hook")
         self.rollout("deployment/t1-web")
         self.rollout(GATEWAY)
         self.check_healthy("Baseline")
@@ -296,7 +302,7 @@ class Lab:
             self.patch(target, resource, path, fault, {**annotations, OWNER: self.run_id})
             self.check_fault(case)
             if hook:
-                run_fault_hook(hook, case, self.context)
+                run_fault_hook(hook, case, self.context, timeout=hook_timeout)
         except BaseException:
             failed = True
             raise
@@ -331,14 +337,28 @@ def interrupt(signum, _frame):
     raise InterruptedError(f"Interrupted by signal {signum}")
 
 
+def hook_timeout_value(value):
+    try:
+        timeout = int(value)
+    except ValueError:
+        raise argparse.ArgumentTypeError("must be an integer from 1 to 900 seconds") from None
+    if not 1 <= timeout <= MAX_HOOK_TIMEOUT:
+        raise argparse.ArgumentTypeError("must be an integer from 1 to 900 seconds")
+    return timeout
+
+
 def main():
     parser = argparse.ArgumentParser(description="Reproduce and restore an incident-lab fixture.")
     parser.add_argument("--context", required=True, help="Explicit kubeconfig context for the lab")
     parser.add_argument("--case", choices=("t1", "t3"), required=True)
-    parser.add_argument("--on-fault", metavar="EXECUTABLE", help="POSIX only: run with the case name before restoring (max 300s)")
+    parser.add_argument("--on-fault", metavar="EXECUTABLE", help="POSIX only: run with the case name before restoring")
+    parser.add_argument("--hook-timeout", metavar="SECONDS", type=hook_timeout_value,
+                        help="Hook time limit in seconds (1–900, default 300); requires --on-fault")
     args = parser.parse_args()
     if not args.context.strip():
         parser.error("--context must not be empty")
+    if args.hook_timeout is not None and not args.on_fault:
+        parser.error("--hook-timeout requires --on-fault")
     if args.on_fault and os.name != "posix":
         parser.error("--on-fault requires POSIX Python")
     hook = shutil.which(args.on_fault) if args.on_fault else None
@@ -350,7 +370,8 @@ def main():
     signal.signal(signal.SIGINT, interrupt)
     signal.signal(signal.SIGTERM, interrupt)
     try:
-        Lab(args.context).reproduce(args.case, hook)
+        options = {} if args.hook_timeout is None else {"hook_timeout": args.hook_timeout}
+        Lab(args.context).reproduce(args.case, hook, **options)
     except (RuntimeError, OSError, subprocess.SubprocessError, KeyError, ValueError) as error:
         print(f"Reproduction failed: {error}", file=sys.stderr)
         return 1

@@ -24,6 +24,8 @@
 
 随后在 GitHub 托管的隔离 kind 集群，以真实本地 Qwen2.5-7B 模型首次运行了 [Linux 原生调查钩子](evidence/hosted-linux-real-model-initial.json)。T1/T3 均调用了三个只读工具，但工具结果返回后的请求超过模型服务的 8192 Token 上下文，两次调查均失败，没有得到可核实的最终根因。两次故障均恢复、隔离集群已删除；这是合成实验，不代表生产准确率。
 
+精简路由证据并增加上下文后[重新运行](evidence/hosted-linux-real-model-compact.json)：路由输出由约 27 KB 降到约 1.2–1.5 KB，本次未出现上下文超限。T1 在 300 秒时限内未完成；T3 返回了回答，但没有对照日志端口 81 和 Service 端口 80，未达到根因验收。两次故障均恢复，隔离集群已删除；这仍不是独立人工 UAT。
+
 复测中，模型虽被要求不提出修改，仍在文字中给出了修复建议；这些建议没有被执行。实际权限由只读工具和 Kubernetes RBAC 约束，恢复由操作者执行。
 
 上述 Kubernetes 实验之后，复现脚本增加了调查钩子的上下文一致性检查。原证据保留当时的源码哈希；新版本已在同一隔离命名空间复验 T1/T3 和恢复，[新证据](evidence/context-hook-smoke.json)记录了上下文拒绝与测试钩子结果。该钩子没有调用模型。
@@ -134,6 +136,8 @@ bash "$LAB_DIR/scripts/reproduce.sh" --context "$LAB_CONTEXT" --case t3 --on-fau
 ```
 
 用工具调用和返回的证据验收模型结果：T1 需指出 Service Selector 和 Pod 标签不匹配；T3 需比较日志的 81 与 Service 的 80。模型调用成功退出并不代表根因判断通过。历史结果见上方案例，和新脚本的复跑记录分别统计。
+
+调查钩子默认限时 300 秒；在隔离实验中使用较慢的本地模型时，可随 `--on-fault` 显式传入 `--hook-timeout 600`，允许范围为 1–900 秒。超时后脚本仍会终止钩子并尝试恢复故障；时限越长，故障保持时间也越长。
 
 在安装 HolmesGPT 0.43.0 的 Python 环境中运行 `python tests/verify_holmes_guard.py`，可用本机模拟模型服务检查工具白名单和拒绝行为，不需要 Kubernetes 集群或模型密钥；这不能替代真实调查验收。
 
