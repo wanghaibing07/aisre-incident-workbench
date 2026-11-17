@@ -26,6 +26,10 @@
 
 精简路由证据并增加上下文后[重新运行](evidence/hosted-linux-real-model-compact.json)：路由输出由约 27 KB 降到约 1.2–1.5 KB，本次未出现上下文超限。T1 在 300 秒时限内未完成；T3 返回了回答，但没有对照日志端口 81 和 Service 端口 80，未达到根因验收。两次故障均恢复，隔离集群已删除；这仍不是独立人工 UAT。
 
+将隔离实验的钩子时限调整为 600 秒后，第三轮 [Linux 原生调查](evidence/hosted-linux-real-model-longer.json)的两个钩子均完成，但模型仍未正确定位：T1 错称 selector 与 Pod 标签匹配；T3 未对照 81 与 80，并建议调整超时。两次故障均已恢复，该建议没有执行。工作流成功只表示实验和恢复步骤完成，**不表示模型根因判断通过**。
+
+托管实验产物只适用于合成集群：日志中的地址替换是尽力处理，无法保证覆盖跨多行地址，也可能误替换相邻数字；不要把这套日志导出流程直接用于真实集群或敏感数据。
+
 复测中，模型虽被要求不提出修改，仍在文字中给出了修复建议；这些建议没有被执行。实际权限由只读工具和 Kubernetes RBAC 约束，恢复由操作者执行。
 
 上述 Kubernetes 实验之后，复现脚本增加了调查钩子的上下文一致性检查。原证据保留当时的源码哈希；新版本已在同一隔离命名空间复验 T1/T3 和恢复，[新证据](evidence/context-hook-smoke.json)记录了上下文拒绝与测试钩子结果。该钩子没有调用模型。
@@ -66,6 +70,8 @@ T3 的两轮调查使用相同故障描述，Agent 自主调用工具。**增强
 - [k8s/incident-lab.yaml](k8s/incident-lab.yaml)：Namespace、两个 Deployment、两个 Service 与 Gateway ConfigMap。
 - [docs/architecture.md](docs/architecture.md)：业务调用链、取证过程与边界。
 - [docs/technical-report.md](docs/technical-report.md)：T1/T3 关键证据、实验结果及工程取舍。
+
+服务路由工具保留 Service 的 ClusterIP、端口、selector 和 Pod 标签，并计算标签匹配结果，方便对照日志中的上游地址。标签匹配不等于端点就绪；输入缺失或不完整时不会把未知状态写成确定结论。模型仍需要正确解释这些证据。
 
 ## 复现与验证
 

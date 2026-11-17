@@ -68,7 +68,10 @@ for name in ('smoke','t1','t3','model'):
     text=re.sub(r'(?i)bearer\s+[A-Za-z0-9._~+/=-]+','Bearer [REDACTED]',text)
     text=re.sub(r'\beyJ[A-Za-z0-9_-]{16,}\.[A-Za-z0-9_-]{16,}\.[A-Za-z0-9_-]{16,}\b','[REDACTED]',text)
     text=re.sub(r'\b[A-Za-z0-9+/=_-]{100,}\b','[REDACTED]',text)
-    text=re.sub(r'\b(?:\d{1,3}\.){3}\d{1,3}\b','[synthetic-ip]',text)
+    # Rich output can wrap an address once, including within an octet. Avoid
+    # joining separate metrics across multiple lines into a fictitious address.
+    pattern=r'(?<![A-Za-z0-9_.])(?:\d(?:\s*\d){0,2}\s*\.\s*){3}\d(?:\s*\d){0,2}(?![A-Za-z0-9_.])'
+    text=re.sub(pattern,lambda match:'[synthetic-ip]' if match.group().count('\n') <= 1 else match.group(),text)
     (out/(name+'.sanitized.log')).write_text(text,encoding='utf8')
 PY
   event experiment_exit "$status" || true
@@ -154,7 +157,9 @@ def scrub(value):
     value=str(value).replace(key,'[REDACTED]')[:800]
     value=re.sub(r'(?i)bearer\s+[A-Za-z0-9._~+/=-]+','Bearer [REDACTED]',value)
     value=re.sub(r'\beyJ[A-Za-z0-9_-]{16,}\.[A-Za-z0-9_-]{16,}\.[A-Za-z0-9_-]{16,}\b','[REDACTED]',value)
-    return re.sub(r'\b[A-Za-z0-9+/=_-]{100,}\b','[REDACTED]',value)
+    value=re.sub(r'\b[A-Za-z0-9+/=_-]{100,}\b','[REDACTED]',value)
+    pattern=r'(?<![A-Za-z0-9_.])(?:\d(?:\s*\d){0,2}\s*\.\s*){3}\d(?:\s*\d){0,2}(?![A-Za-z0-9_.])'
+    return re.sub(pattern,lambda match:'[synthetic-ip]' if match.group().count('\n') <= 1 else match.group(),value)
 started=time.monotonic()
 try:
     try:
@@ -266,4 +271,5 @@ for scenario in t1 t3; do
   fi
 done
 event model_answers require_independent_review
+printf '%s\n' '::warning::A successful run confirms execution and recovery only. Review both model answers against the fault evidence; it does not certify root-cause accuracy.'
 exit "$failed"

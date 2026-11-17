@@ -16,9 +16,11 @@ toolsets:
 
         '
     - name: incident_lab_service_route_evidence
-      description: Read compact Pod labels and readiness, Service selectors and ports,
-        and EndpointSlice addresses, conditions and ports in incident-lab. Fixed
-        read-only namespace; no parameters. Missing fields are not inferred.
+      description: Read compact Pod labels and readiness, Service selectors, cluster
+        IPs and ports, and EndpointSlice addresses, conditions and ports in incident-lab.
+        Selector analysis compares labels only; it does not establish endpoint
+        availability or readiness. Missing fields remain unknown. Fixed read-only
+        namespace; no parameters.
       command: |
         python3 -c '
         import json, subprocess
@@ -26,6 +28,11 @@ toolsets:
         data = json.loads(raw.stdout)
         if not isinstance(data, dict) or not isinstance(data.get("items"), list):
             raise ValueError("Expected a Kubernetes resource list")
+        metadata = data.get("metadata")
+        if metadata is not None and not isinstance(metadata, dict):
+            raise ValueError("Expected Kubernetes list metadata")
+        if metadata and metadata.get("continue"):
+            raise ValueError("Kubernetes resource list is incomplete")
         result = {"namespace": "incident-lab", "pods": [], "services": [], "endpoint_slices": []}
         def fields(value, names):
             if value is None:
@@ -53,6 +60,8 @@ toolsets:
             elif kind == "Service":
                 spec = item.get("spec") or {}
                 result["services"].append({"name": meta.get("name"), "selector": spec.get("selector"),
+                                           "type": spec.get("type"), "cluster_ip": spec.get("clusterIP"),
+                                           "cluster_ips": spec.get("clusterIPs"),
                                            "ports": ports(spec.get("ports"), ("name", "protocol", "port", "targetPort", "nodePort", "appProtocol"))})
             elif kind == "EndpointSlice":
                 endpoints = item.get("endpoints")
@@ -71,6 +80,33 @@ toolsets:
                 })
             else:
                 raise ValueError("Unexpected resource kind: " + str(kind))
+        for service in result["services"]:
+            selector = service["selector"]
+            valid = isinstance(selector, dict) and bool(selector) and all(
+                isinstance(key, str) and bool(key) and isinstance(value, str)
+                for key, value in selector.items()
+            )
+            if not valid:
+                service["selector_analysis"] = None
+                continue
+            matches = []
+            unknown = 0
+            for pod in result["pods"]:
+                labels = pod["labels"]
+                name = pod["name"]
+                if (not isinstance(name, str) or not name or not isinstance(labels, dict)
+                        or any(not isinstance(key, str) or not isinstance(value, str)
+                               for key, value in labels.items())):
+                    unknown += 1
+                elif all(labels.get(key) == value for key, value in selector.items()):
+                    matches.append(name)
+            service["selector_analysis"] = {
+                "known_matching_pod_names": matches,
+                "matching_pod_count": len(matches) if unknown == 0 else None,
+                "unknown_pod_count": unknown,
+                "complete": unknown == 0,
+                "scope": "Label equality only; this does not establish readiness or endpoint availability.",
+            }
         print(json.dumps(result, ensure_ascii=False, separators=(",", ":")))
         '
     - name: incident_lab_gateway_error_logs
