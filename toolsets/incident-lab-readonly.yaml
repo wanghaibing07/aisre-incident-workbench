@@ -110,5 +110,148 @@ toolsets:
         print(json.dumps(result, ensure_ascii=False, separators=(",", ":")))
         '
     - name: incident_lab_gateway_error_logs
-      description: "Read recent Nginx logs of t3-gateway in incident-lab. Use to investigate upstream connection failures and the actual upstream port. Fixed namespace, no parameters, read-only."
-      command: "kubectl --request-timeout=10s -n incident-lab logs deployment/t3-gateway --since=15m --tail=80 --timestamps"
+      description: Read recent Nginx logs of t3-gateway and compare explicitly logged
+        upstream IP and port with the current Service snapshot in incident-lab.
+        The logs are historical, the Service snapshot is current, and a correlation
+        does not establish a root cause. Fixed namespace, no parameters, read-only.
+      command: |
+        python3 -c '
+        import ipaddress, json, re, subprocess, sys
+        from urllib.parse import urlsplit
+        namespace = "incident-lab"
+        logs = subprocess.run(["kubectl", "--request-timeout=10s", "-n", namespace, "logs", "deployment/t3-gateway", "--since=15m", "--tail=80", "--timestamps"], stdout=subprocess.PIPE, text=True, encoding="utf-8", errors="strict", check=True, timeout=20).stdout
+        raw_services = subprocess.run(["kubectl", "--request-timeout=10s", "-n", namespace, "get", "services", "-o", "json"], stdout=subprocess.PIPE, text=True, encoding="utf-8", errors="strict", check=True, timeout=20).stdout
+        data = json.loads(raw_services)
+        if not isinstance(data, dict) or not isinstance(data.get("items"), list):
+            raise ValueError("Expected a complete Kubernetes Service list")
+        metadata = data.get("metadata")
+        if metadata is not None and not isinstance(metadata, dict):
+            raise ValueError("Invalid Kubernetes Service list metadata")
+        if metadata and (metadata.get("continue") or metadata.get("remainingItemCount")):
+            raise ValueError("Kubernetes Service list is incomplete")
+        if len(logs.encode("utf-8")) > 524288:
+            raise ValueError("Gateway log snapshot is too large to inspect safely")
+        services = []
+        incomplete_addresses = False
+        names = set()
+        for item in data["items"]:
+            if not isinstance(item, dict) or item.get("kind") not in (None, "Service"):
+                raise ValueError("Unexpected Service list item")
+            meta, spec = item.get("metadata"), item.get("spec")
+            if not isinstance(meta, dict) or not isinstance(spec, dict) or not isinstance(meta.get("name"), str) or not meta["name"]:
+                raise ValueError("Incomplete Service identity or specification")
+            if meta.get("namespace") not in (None, namespace):
+                raise ValueError("Service belongs to a different namespace")
+            name = meta["name"]
+            if name in names:
+                raise ValueError("Duplicate Service identity")
+            names.add(name)
+            primary, addresses = spec.get("clusterIP"), spec.get("clusterIPs")
+            if spec.get("type") == "ExternalName" and primary in (None, "") and addresses in (None, []):
+                continue
+            if primary == "None" and addresses in (None, ["None"]):
+                continue
+            if not isinstance(primary, str) or not primary or primary == "None" or "%" in primary:
+                incomplete_addresses = True
+                continue
+            try:
+                known = {str(ipaddress.ip_address(primary))}
+                if addresses is not None:
+                    if not isinstance(addresses, list) or not addresses or any(not isinstance(value, str) or "%" in value for value in addresses):
+                        raise ValueError("Invalid cluster IP list")
+                    listed = {str(ipaddress.ip_address(value)) for value in addresses}
+                    if str(ipaddress.ip_address(primary)) not in listed:
+                        raise ValueError("Primary cluster IP missing from list")
+                    known.update(listed)
+            except ValueError:
+                incomplete_addresses = True
+                continue
+            services.append({"name": name, "addresses": known, "ports": spec.get("ports")})
+        upstreams = []
+        def log_fields(line):
+            segments = []
+            start = 0
+            quoted = False
+            escaped = False
+            for index, char in enumerate(line):
+                if quoted:
+                    if escaped:
+                        escaped = False
+                    elif char == "\\":
+                        escaped = True
+                    elif char == "\"":
+                        quoted = False
+                elif char == "\"":
+                    quoted = True
+                elif char == ",":
+                    segments.append(line[start:index].strip())
+                    start = index + 1
+            if quoted or escaped:
+                raise ValueError("Incomplete or malformed quoted log field")
+            segments.append(line[start:].strip())
+            return segments
+        for raw_line in logs.splitlines(keepends=True):
+            if not raw_line.endswith("\n"):
+                upstreams.append({"status": "unknown", "reason": "possibly_truncated_log_line"})
+                continue
+            line = raw_line.rstrip("\r\n")
+            try:
+                fields_in_line = log_fields(line)
+                matches = []
+                for field in fields_in_line:
+                    if not re.match(r"^upstream\s*:", field):
+                        continue
+                    match = re.fullmatch(r"upstream\s*:\s*\"((?:[^\"\\]|\\.)*)\"\s*", field)
+                    if match is None:
+                        raise ValueError("Incomplete or malformed upstream log field")
+                    matches.append(match)
+            except ValueError:
+                upstreams.append({"status": "unknown", "reason": "incomplete_or_malformed_log_line"})
+                continue
+            for match in matches:
+                if "\\" in match.group(1):
+                    upstreams.append({"status": "unknown", "reason": "upstream_not_explicit_http_ip_and_port"})
+                    continue
+                if ", " in match.group(1):
+                    upstreams.append({"status": "unknown", "reason": "multiple_or_noncanonical_upstream_values"})
+                    continue
+                try:
+                    url = urlsplit(match.group(1))
+                    if url.scheme not in ("http", "https") or url.username is not None or url.password is not None or url.hostname is None or url.port is None:
+                        raise ValueError("Not an explicit HTTP upstream with port")
+                    host = ipaddress.ip_address(url.hostname)
+                    if host.version == 6 and not url.netloc.startswith("["):
+                        raise ValueError("IPv6 upstream must use brackets")
+                    if "%" in url.hostname or not 1 <= url.port <= 65535:
+                        raise ValueError("Invalid upstream IP or port")
+                except ValueError:
+                    upstreams.append({"status": "unknown", "reason": "upstream_not_explicit_http_ip_and_port"})
+                    continue
+                observed = {"ip": str(host), "port": url.port}
+                candidates = [service for service in services if str(host) in service["addresses"]]
+                if len(candidates) > 1:
+                    upstreams.append({**observed, "status": "ambiguous", "reason": "multiple_current_services_share_ip"})
+                    continue
+                if incomplete_addresses:
+                    upstreams.append({**observed, "status": "unknown", "reason": "incomplete_service_addresses"})
+                    continue
+                if not candidates:
+                    upstreams.append({**observed, "status": "unknown", "reason": "no_current_service_ip_match"})
+                    continue
+                service = candidates[0]
+                ports = service["ports"]
+                if not isinstance(ports, list) or not ports or any(not isinstance(item, dict) or item.get("protocol") not in ("TCP", "UDP", "SCTP") or type(item.get("port")) is not int or not 1 <= item["port"] <= 65535 for item in ports):
+                    upstreams.append({**observed, "status": "unknown", "service": service["name"], "reason": "incomplete_service_ports_or_protocols"})
+                    continue
+                tcp = sorted({item["port"] for item in ports if item["protocol"] == "TCP"})
+                if not tcp:
+                    upstreams.append({**observed, "status": "unknown", "service": service["name"], "reason": "no_current_tcp_service_port"})
+                    continue
+                upstreams.append({**observed, "status": "matched", "service": service["name"], "current_tcp_service_ports": tcp, "port_comparison": "equals_current_tcp_service_port" if url.port in tcp else "differs_from_current_tcp_service_ports"})
+        print("Historical gateway log (last 15 minutes, up to 80 lines):")
+        sys.stdout.write(logs)
+        if logs and not logs.endswith("\n"):
+            print()
+        print("Current Service correlation (JSON):")
+        print(json.dumps({"namespace": namespace, "caveat": "Logs are historical, capped at 80 lines, and from one deployment Pod; Services are a later current snapshot. An IP/port correlation does not prove a root cause.", "upstreams": upstreams}, ensure_ascii=False, separators=(",", ":")))
+        '
