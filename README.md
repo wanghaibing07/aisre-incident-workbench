@@ -53,10 +53,10 @@ T3 的两轮调查使用相同故障描述，Agent 自主调用工具。**增强
 
 ## 复现与验证
 
-在专用测试集群或新建的 kind 集群运行。需要 Bash、Python 3 和 `kubectl`。脚本会创建 `incident-lab`，随后依次注入并恢复 T1/T3，不能用于有现成同名命名空间的集群。
+在专用测试集群或新建的 kind 集群运行。需要 Bash、Python 3 和 `kubectl`；新建 kind 集群还需要 Docker 和 kind v0.30.0。脚本会创建 `incident-lab`，随后依次注入并恢复 T1/T3，不能用于有现成同名命名空间的集群。
 
 ```bash
-kind create cluster --name incident-workbench
+kind create cluster --name incident-workbench --image 'kindest/node:v1.34.0@sha256:7416a61b42b1662ca6ca89f02028ac133a309a2a30ba309614e8ec94d976dc5a'
 bash scripts/smoke.sh --context kind-incident-workbench
 ```
 
