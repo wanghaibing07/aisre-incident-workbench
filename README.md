@@ -41,7 +41,7 @@ HolmesGPT → namespace 限定的只读取证工具 → Kubernetes API / 网关�
 下图根据一次 [T3 模型调查记录](evidence/holmes-model-investigations.json)整理：
 
 ```mermaid
-flowchart LR
+flowchart TB
     request["业务请求 /api/"] --> gateway["Nginx Gateway<br/>/healthz：200<br/>/api/：502"]
     gateway -. "上游 :81 ≠ Service :80" .-> service["Service t1-web<br/>服务端口 80"]
     service --> pod["Web Pod<br/>1 个就绪端点"]
@@ -49,7 +49,7 @@ flowchart LR
     agent -. "对照 Service 和端点" .-> service
 ```
 
-**调查结果：**模型指出网关上游端口 81 与 Service 端口 80 不匹配。恢复后，`/healthz` 和 `/api/` 均返回 200。
+**调查结果：** 模型指出网关上游端口 81 与 Service 端口 80 不匹配。恢复后，`/healthz` 和 `/api/` 均返回 200。
 
 另一轮 [Linux 原生调查](evidence/hosted-linux-real-model-correlated.json)未达到根因判断标准；不同调查的结果分别保留在案例中。
 
